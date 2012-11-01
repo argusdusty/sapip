@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-var ExampleQueue = new(Queue)
+var ExampleQueue = new(sapip.Queue)
 const ExampleDelay = 1000*time.Millisecond
 const ExampleSimultaneousLimit = 100
 
@@ -18,7 +18,7 @@ func main() {
 	ExampleCommand := func(input string) string { return input + " Done!" }
 	for i := 10; i > 0; i-- {
 		r, _ := ExampleQueue.AddElement("Testing: " + string(byte(i + 96)), ExampleCommand, i)
-		print("Insert: ", i, " \n")
+		print("Insert: " + string(byte(i + 96)), " \n")
 		go func() { print(r.Read(), "\n") }()
 	}
 	time.Sleep(10*time.Second)
