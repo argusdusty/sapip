@@ -112,10 +112,10 @@ func (Q *Queue) Init(Wait time.Duration, SimultaneousLimit int) {
 }
 
 func (Q *Queue) Run() {
-	a := time.Tick(Wait)
+	a := time.Tick(Q.Wait)
 	for _ = range(a) {
 		Q.Lock.Lock()
-		if len(Q.Elements.PrioritySorted) > 0 && len(Q.ExecElements) < SimultaneousLimit {
+		if len(Q.Elements.PrioritySorted) > 0 && len(Q.ExecElements) < Q.SimultaneousLimit {
 			e := Q.Elements.Pop()
 			go Q.Exec(e)
 		}
