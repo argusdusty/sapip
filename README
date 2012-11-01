@@ -1,7 +1,7 @@
 "Safe Asynchronous Periodic Indexed Priority Queue"
 Safe: Multiple threads can access the return value of each command
 Asynchronous: Multiple commands can be run simultaneously, up to a defined limit.
-Periodic: The top command is executed/removed on a periodic basis, over a periodic delay
+Periodic: The top command is executed/removed on a periodic basis, over a given delay
 Indexed: Each command is uniquely defined by a string, which can allow log-time lookup. This string serves as the input value for the commands
 Priority: Lowest priority command goes first. Supports multiple commands having the same priority.
 Queue: First in, first out, under a given priority.
