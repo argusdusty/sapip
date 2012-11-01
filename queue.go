@@ -95,7 +95,7 @@ func (Q *Queue) Exec(e Element) {
 	}()
 	defer func() {
 		r := ""
-		defer e.OutChannel.Return(r)
+		defer func() { e.OutChannel.Return(r) }()
 		r = e.Function(e.Name)
 	}()
 	Q.ExecLock.Lock(); defer Q.ExecLock.Unlock()
