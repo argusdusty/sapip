@@ -100,7 +100,16 @@ func (Q *Queue) Exec(e Element) {
 	Q.ExecElements = append(Q.ExecElements, e)
 }
 
-func (Q *Queue) Run(Wait time.Duration, SimultaneousLimit int) {
+func (Q *Queue) Init(Wait time.Duration, SimultaneousLimit int) {
+	Q.Lock = new(sync.Mutex)
+	Q.ExecLock = new(sync.Mutex)
+	Q.Elements = DoubleSortedElements{make(map[string]int, 0), make([]Element, 0)}
+	Q.ExecElements = make([]Element, 0)
+	Q.Wait = Wait
+	Q.SimultaneousLimit = SimultaneousLimit
+}
+
+func (Q *Queue) Run() {
 	a := time.Tick(Wait)
 	for _ = range(a) {
 		Q.Lock.Lock()
