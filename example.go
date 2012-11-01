@@ -1,7 +1,7 @@
 package main
 
 import (
-	"https://github.com/argusdusty/sapip"
+	"github.com/argusdusty/sapip"
 	"time"
 )
 
@@ -16,7 +16,7 @@ func init() {
 func main() {
 	ExampleCommand := func(input string) { return input + " Done!" }
 	for i := 10; i > 0; i-- {
-		r := ExampleQueue.AddElement("Testing: " + string(char(i)))
+		r := ExampleQueue.AddElement("Testing: " + string(byte(i + 96)))
 		go print(r.Read(), "\n")
 	}
 	return
