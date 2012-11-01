@@ -39,6 +39,8 @@ type Queue struct {
 	ExecLock *sync.Mutex
 	Elements DoubleSortedElements
 	ExecElements []Element
+	Wait time.Duration
+	SimultaneousLimit int
 }
 
 type SafeReturn chan string // Allows multiple threads to read from this with .Read(), which blocks until a return value is sent
