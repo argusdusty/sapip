@@ -1,0 +1,13 @@
+"Safe Asynchronous Periodic Indexed Priority Queue"
+Safe: Multiple threads can access the return value of each command
+Asynchronous: Multiple commands can be run simultaneously, up to a defined limit.
+Periodic: The top command is executed/removed on a periodic basis, over a periodic delay
+Indexed: Each command is uniquely defined by a string, which can allow log-time lookup. This string serves as the input value for the commands
+Priority: Lowest priority command goes first. Supports multiple commands having the same priority.
+Queue: First in, first out, under a given priority.
+
+Commands are functions which take a string (their name) as input and return a string. Feel free to modify those data types to support other return/input values. I didn't want to use the generalized interface{} for performance reasons.
+
+License: CC BY-SA 3.0 (http://creativecommons.org/licenses/by-sa/3.0/)
+You are free to share and remix this work, as long as you attribute the original author, and share it under a similar license
+Author: Mark Canning
