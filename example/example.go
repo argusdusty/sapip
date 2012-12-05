@@ -21,7 +21,7 @@ func main() {
 		print("Insert: " + string(byte(i + 96)), " at position: " + strconv.Itoa(index), " \n")
 		go func() { print(r.Read(), "\n") }()
 	}
-	r, index := ExampleQueue.AddElement("Testing: Error", func(input string) { panic(input); ExampleCommand(input) }, 5)
+	r, index := ExampleQueue.AddElement("Testing: Error", func(input string) string { panic(input); return input + " Done!" }, 5)
 	print("Insert: Error", " at position: " + strconv.Itoa(index), " \n")
 	go func() { print(r.Read(), "\n") }()
 	time.Sleep(10*time.Second)
