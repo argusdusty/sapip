@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/argusdusty/sapip"
 	"time"
+	"strconv"
 )
 
 var ExampleQueue = new(sapip.Queue)
@@ -18,7 +19,7 @@ func main() {
 	ExampleCommand := func(input string) string { return input + " Done!" }
 	for i := 10; i > 0; i-- {
 		r, index := ExampleQueue.AddElement("Testing: " + string(byte(i + 96)), ExampleCommand, i)
-		print("Insert: " + string(byte(i + 96)), " at position: " + index, " \n")
+		print("Insert: " + string(byte(i + 96)), " at position: " + strconv.Itoa(index), " \n")
 		go func() { print(r.Read(), "\n") }()
 	}
 	time.Sleep(10*time.Second)
