@@ -8,6 +8,11 @@ import (
 
 type Command func(value string) string
 
+type ReducedElement struct {
+	Priority int
+	OutChannel SafeReturn
+}
+
 type Element struct {
 	Name string
 	Function Command
@@ -16,7 +21,7 @@ type Element struct {
 }
 
 type DoubleSortedElements struct {
-	NameIndex map[string]int
+	NameIndex map[string]ReducedElement
 	PrioritySorted []Element
 }
 
@@ -33,23 +38,24 @@ type SafeReturn chan string // Allows multiple threads to read from this with .R
 func (SR SafeReturn) Return(value string) { SR <- value }
 func (SR SafeReturn) Read() string { value := <- SR; SR <- value; return value }
 
+// Returns the OutChannel of e, and the location it is inserted in D
 func (D *DoubleSortedElements) AddElement(e Element) (SafeReturn, int) {
 	p, ok := D.NameIndex[e.Name]
 	if ok {
-		j := sort.Search(len(D.PrioritySorted), func(j int) bool { return D.PrioritySorted[j].Priority >= p })
-		for D.PrioritySorted[j].Name != e.Name { j++ }
-		if p > e.Priority {
-			D.NameIndex[e.Name] = e.Priority
+		if p.Priority > e.Priority {
+			j := sort.Search(len(D.PrioritySorted), func(j int) bool { return D.PrioritySorted[j].Priority >= p.Priority })
+			for D.PrioritySorted[j].Name != e.Name { j++ }
+			D.NameIndex[e.Name] = ReducedElement{e.Priority, e.OutChannel}
 			D.PrioritySorted = append(D.PrioritySorted[:j], D.PrioritySorted[j+1:]...)
 			k := sort.Search(len(D.PrioritySorted), func(k int) bool { return D.PrioritySorted[k].Priority > e.Priority })
 			D.PrioritySorted = append(D.PrioritySorted[:k], append([]Element{e}, D.PrioritySorted[k:]...)...)
 			return e.OutChannel, k + 1
 		}
-		return D.PrioritySorted[j].OutChannel, j + 1
+		return p.OutChannel, p.Priority
 	}
 	j := sort.Search(len(D.PrioritySorted), func(j int) bool { return D.PrioritySorted[j].Priority > e.Priority })
 	D.PrioritySorted = append(D.PrioritySorted[:j], append([]Element{e}, D.PrioritySorted[j:]...)...)
-	D.NameIndex[e.Name] = e.Priority
+	D.NameIndex[e.Name] = ReducedElement{e.Priority, e.OutChannel}
 	return e.OutChannel, j + 1
 }
 
@@ -91,7 +97,7 @@ func (Q *Queue) Exec(e Element) {
 func (Q *Queue) Init(Wait time.Duration, SimultaneousLimit int) {
 	Q.Lock = new(sync.Mutex)
 	Q.ExecLock = new(sync.Mutex)
-	Q.Elements = DoubleSortedElements{make(map[string]int, 0), make([]Element, 0)}
+	Q.Elements = DoubleSortedElements{make(map[string]ReducedElement, 0), make([]Element, 0)}
 	Q.ExecElements = make([]Element, 0)
 	Q.Wait = Wait
 	Q.SimultaneousLimit = SimultaneousLimit
