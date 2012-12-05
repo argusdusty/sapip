@@ -17,8 +17,8 @@ func init() {
 func main() {
 	ExampleCommand := func(input string) string { return input + " Done!" }
 	for i := 10; i > 0; i-- {
-		r, _ := ExampleQueue.AddElement("Testing: " + string(byte(i + 96)), ExampleCommand, i)
-		print("Insert: " + string(byte(i + 96)), " \n")
+		r, index := ExampleQueue.AddElement("Testing: " + string(byte(i + 96)), ExampleCommand, i)
+		print("Insert: " + string(byte(i + 96)), " at position: " + index, " \n")
 		go func() { print(r.Read(), "\n") }()
 	}
 	time.Sleep(10*time.Second)
