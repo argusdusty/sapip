@@ -4,7 +4,12 @@ import (
 	"sync"
 	"time"
 	"sort"
+	"fmt"
 )
+
+type SafeReturn chan string // Allows multiple threads to read from this with .Read(), which blocks until a return value is sent
+func (SR SafeReturn) Return(value string) { SR <- value }
+func (SR SafeReturn) Read() string { value := <- SR; SR <- value; return value }
 
 type Command func(value string) string
 
@@ -25,13 +30,19 @@ type Queue struct {
 	ExecLock *sync.Mutex
 	Elements DoubleSortedElements
 	ExecElements []Element
-	Wait time.Duration
 	SimultaneousLimit int
+	stop bool
 }
 
-type SafeReturn chan string // Allows multiple threads to read from this with .Read(), which blocks until a return value is sent
-func (SR SafeReturn) Return(value string) { SR <- value }
-func (SR SafeReturn) Read() string { value := <- SR; SR <- value; return value }
+func (Q *Queue) Init(Wait time.Duration, SimultaneousLimit int) {
+	Q.Lock = new(sync.Mutex)
+	Q.ExecLock = new(sync.Mutex)
+	Q.Elements = DoubleSortedElements{make(map[string]int, 0), make([]Element, 0)}
+	Q.ExecElements = make([]Element, 0)
+	Q.SimultaneousLimit = SimultaneousLimit
+	Q.stop = false
+	go Q.Run(Wait)
+}
 
 func (D *DoubleSortedElements) AddElement(e Element) (SafeReturn, int) {
 	p, ok := D.NameIndex[e.Name]
@@ -61,8 +72,8 @@ func (D *DoubleSortedElements) Pop() Element {
 }
 
 func (Q *Queue) AddElement(Name string, Function Command, Priority int) (SafeReturn, int) {
-	Q.Lock.Lock(); Q.ExecLock.Lock()
-	defer Q.Lock.Unlock(); defer Q.ExecLock.Unlock()
+	Q.Lock.Lock(); defer Q.Lock.Unlock()
+	Q.ExecLock.Lock(); defer Q.ExecLock.Unlock()
 	for _, e := range(Q.ExecElements) { if Name == e.Name { return e.OutChannel, 0 } }
 	e := Element{Name, Function, Priority, make(SafeReturn, 1)}
 	return Q.Elements.AddElement(e)
@@ -70,41 +81,43 @@ func (Q *Queue) AddElement(Name string, Function Command, Priority int) (SafeRet
 
 func (Q *Queue) Exec(e Element) {
 	defer func() {
-		Q.ExecLock.Lock()
-		defer Q.ExecLock.Unlock()
-		for i, elem := range(Q.ExecElements) {
+		if r := recover(); r != nil {
+			fmt.Println("Error in queue on element:", e.Name)
+		}
+		Q.ExecLock.Lock(); defer Q.ExecLock.Unlock()
+		for i := len(Q.ExecElements) - 1; i >= 0; i-- {
+			elem := Q.ExecElements[i]
 			if elem.Name == e.Name {
 				Q.ExecElements = append(Q.ExecElements[:i], Q.ExecElements[i+1:]...)
 				break
 			}
 		}
 	}()
-	defer func() {
-		r := ""
-		defer func() { e.OutChannel.Return(r) }()
-		r = e.Function(e.Name)
-	}()
-	Q.ExecLock.Lock(); defer Q.ExecLock.Unlock()
-	Q.ExecElements = append(Q.ExecElements, e)
+	r := ""
+	defer func() { e.OutChannel.Return(r) }()
+	r = e.Function(e.Name)
 }
 
-func (Q *Queue) Init(Wait time.Duration, SimultaneousLimit int) {
-	Q.Lock = new(sync.Mutex)
-	Q.ExecLock = new(sync.Mutex)
-	Q.Elements = DoubleSortedElements{make(map[string]int, 0), make([]Element, 0)}
-	Q.ExecElements = make([]Element, 0)
-	Q.Wait = Wait
-	Q.SimultaneousLimit = SimultaneousLimit
-}
-
-func (Q *Queue) Run() {
-	a := time.Tick(Q.Wait)
+func (Q *Queue) Run(Wait time.Duration) {
+	a := time.Tick(Wait)
 	for _ = range(a) {
-		Q.Lock.Lock()
-		if len(Q.Elements.PrioritySorted) > 0 && len(Q.ExecElements) < Q.SimultaneousLimit {
-			e := Q.Elements.Pop()
-			go Q.Exec(e)
-		}
-		Q.Lock.Unlock()
+		if Q.stop { break }
+		func() {
+			Q.Lock.Lock(); defer Q.Lock.Unlock()
+			if len(Q.Elements.PrioritySorted) > 0 && len(Q.ExecElements) < Q.SimultaneousLimit {
+				e := Q.Elements.Pop()
+				func() {
+					Q.ExecLock.Lock(); defer Q.ExecLock.Unlock()
+					Q.ExecElements = append(Q.ExecElements, e)
+				}()
+				go Q.Exec(e)
+			}
+		}()
 	}
+}
+
+func (Q *Queue) Stop() {
+	Q.Lock.Lock(); defer Q.Lock.Unlock()
+	Q.ExecLock.Lock(); defer Q.ExecLock.Unlock()
+	Q.stop = true
 }

@@ -12,7 +12,6 @@ const ExampleSimultaneousLimit = 100
 
 func init() {
 	ExampleQueue.Init(ExampleDelay, ExampleSimultaneousLimit)
-	go ExampleQueue.Run()
 }
 
 func main() {
@@ -22,6 +21,9 @@ func main() {
 		print("Insert: " + string(byte(i + 96)), " at position: " + strconv.Itoa(index), " \n")
 		go func() { print(r.Read(), "\n") }()
 	}
+	r, index := ExampleQueue.AddElement("Testing: Error", func(input string) { panic(input); ExampleCommand(input) }, 5)
+	print("Insert: Error", " at position: " + strconv.Itoa(index), " \n")
+	go func() { print(r.Read(), "\n") }()
 	time.Sleep(10*time.Second)
 	return
 }
