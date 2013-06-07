@@ -1,66 +1,95 @@
 package sapip
 
 import (
+	"log"
+	"sort"
 	"sync"
 	"time"
-	"sort"
-	"fmt"
 )
 
-type SafeReturn chan string // Allows multiple threads to read from this with .Read(), which blocks until a return value is sent
-func (SR SafeReturn) Return(value string) { SR <- value }
-func (SR SafeReturn) Read() string { value := <- SR; SR <- value; return value }
+// Allows multiple threads to read a single value from this with .Read(), which blocks until a return value is sent
+type SafeReturn chan string
 
-type Command func(value string) string
+func (SR SafeReturn) Return(value string) { SR <- value }
+func (SR SafeReturn) Read() string        { value := <-SR; SR <- value; return value }
+
+type ReducedElement struct {
+	Priority   int
+	OutChannel SafeReturn
+}
 
 type Element struct {
-	Name string
-	Function Command
-	Priority int
+	Name       string
+	Data       []string
+	Priority   int
 	OutChannel SafeReturn
 }
 
 type DoubleSortedElements struct {
-	NameIndex map[string]int
+	NameIndex      map[string]int
 	PrioritySorted []Element
 }
 
 type Queue struct {
-	Lock *sync.Mutex
-	ExecLock *sync.Mutex
-	Elements DoubleSortedElements
-	ExecElements []Element
+	Lock              *sync.Mutex
+	ExecLock          *sync.Mutex
+	Elements          DoubleSortedElements
+	ExecElements      []Element
 	SimultaneousLimit int
-	stop bool
+	Function          func(data []string) string
+	stop              bool
 }
 
-func (Q *Queue) Init(Wait time.Duration, SimultaneousLimit int) {
+func (Q *Queue) InitAndRun(Time time.Duration, SimultaneousLimit int, Function func(data []string) string) {
+	Q.Init(SimultaneousLimit, Function)
+	Q.Run(Time)
+}
+
+func (Q *Queue) Init(SimultaneousLimit int, Function func(data []string) string) {
 	Q.Lock = new(sync.Mutex)
 	Q.ExecLock = new(sync.Mutex)
 	Q.Elements = DoubleSortedElements{make(map[string]int, 0), make([]Element, 0)}
 	Q.ExecElements = make([]Element, 0)
 	Q.SimultaneousLimit = SimultaneousLimit
+	Q.Function = Function
 	Q.stop = false
-	go Q.Run(Wait)
 }
 
-func (D *DoubleSortedElements) AddElement(e Element) (SafeReturn, int) {
-	p, ok := D.NameIndex[e.Name]
+func (D *DoubleSortedElements) AddElement(Name, Data string, Priority int) (SafeReturn, int) {
+	p, ok := D.NameIndex[Name]
 	if ok {
 		j := sort.Search(len(D.PrioritySorted), func(j int) bool { return D.PrioritySorted[j].Priority >= p })
-		for D.PrioritySorted[j].Name != e.Name { j++ }
-		if p > e.Priority {
-			D.NameIndex[e.Name] = e.Priority
+		for D.PrioritySorted[j].Name != Name {
+			j++
+		}
+		found := false
+		for _, d := range D.PrioritySorted[j].Data {
+			if d == Data {
+				found = true
+				break
+			}
+		}
+		if p > Priority {
+			BaseData := D.PrioritySorted[j].Data
+			if !found {
+				BaseData = append(BaseData, Data)
+			}
+			D.NameIndex[Name] = Priority
 			D.PrioritySorted = append(D.PrioritySorted[:j], D.PrioritySorted[j+1:]...)
-			k := sort.Search(len(D.PrioritySorted), func(k int) bool { return D.PrioritySorted[k].Priority > e.Priority })
+			k := sort.Search(len(D.PrioritySorted), func(k int) bool { return D.PrioritySorted[k].Priority > Priority })
+			e := Element{Name, BaseData, Priority, make(SafeReturn, 1)}
 			D.PrioritySorted = append(D.PrioritySorted[:k], append([]Element{e}, D.PrioritySorted[k:]...)...)
 			return e.OutChannel, k + 1
 		}
+		if !found {
+			D.PrioritySorted[j].Data = append(D.PrioritySorted[j].Data, Data)
+		}
 		return D.PrioritySorted[j].OutChannel, j + 1
 	}
-	j := sort.Search(len(D.PrioritySorted), func(j int) bool { return D.PrioritySorted[j].Priority > e.Priority })
+	j := sort.Search(len(D.PrioritySorted), func(j int) bool { return D.PrioritySorted[j].Priority > Priority })
+	e := Element{Name, []string{Data}, Priority, make(SafeReturn, 1)}
 	D.PrioritySorted = append(D.PrioritySorted[:j], append([]Element{e}, D.PrioritySorted[j:]...)...)
-	D.NameIndex[e.Name] = e.Priority
+	D.NameIndex[Name] = Priority
 	return e.OutChannel, j + 1
 }
 
@@ -71,20 +100,30 @@ func (D *DoubleSortedElements) Pop() Element {
 	return e
 }
 
-func (Q *Queue) AddElement(Name string, Function Command, Priority int) (SafeReturn, int) {
-	Q.Lock.Lock(); defer Q.Lock.Unlock()
-	Q.ExecLock.Lock(); defer Q.ExecLock.Unlock()
-	for _, e := range(Q.ExecElements) { if Name == e.Name { return e.OutChannel, 0 } }
-	e := Element{Name, Function, Priority, make(SafeReturn, 1)}
-	return Q.Elements.AddElement(e)
+func (Q *Queue) AddElement(Name, Data string, Priority int) (SafeReturn, int) {
+	Q.Lock.Lock()
+	defer Q.Lock.Unlock()
+	Q.ExecLock.Lock()
+	defer Q.ExecLock.Unlock()
+	for _, e := range Q.ExecElements {
+		if Name == e.Name {
+			for _, d := range e.Data {
+				if d == Data {
+					return e.OutChannel, 0
+				}
+			}
+		}
+	}
+	return Q.Elements.AddElement(Name, Data, Priority)
 }
 
 func (Q *Queue) Exec(e Element) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("Error in queue on element:", e.Name)
+			log.Println("Error in queue on element:", e.Name, "-", r)
 		}
-		Q.ExecLock.Lock(); defer Q.ExecLock.Unlock()
+		Q.ExecLock.Lock()
+		defer Q.ExecLock.Unlock()
 		for i := len(Q.ExecElements) - 1; i >= 0; i-- {
 			elem := Q.ExecElements[i]
 			if elem.Name == e.Name {
@@ -95,29 +134,28 @@ func (Q *Queue) Exec(e Element) {
 	}()
 	r := ""
 	defer func() { e.OutChannel.Return(r) }()
-	r = e.Function(e.Name)
+	r = Q.Function(e.Data)
 }
 
 func (Q *Queue) Run(Wait time.Duration) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Queue runtime error:", r)
+		}
+	}()
 	a := time.Tick(Wait)
-	for _ = range(a) {
-		if Q.stop { break }
-		func() {
-			Q.Lock.Lock(); defer Q.Lock.Unlock()
-			if len(Q.Elements.PrioritySorted) > 0 && len(Q.ExecElements) < Q.SimultaneousLimit {
-				e := Q.Elements.Pop()
-				func() {
-					Q.ExecLock.Lock(); defer Q.ExecLock.Unlock()
-					Q.ExecElements = append(Q.ExecElements, e)
-				}()
-				go Q.Exec(e)
-			}
-		}()
+	for _ = range a {
+		if Q.stop {
+			break
+		}
+		Q.Lock.Lock()
+		if len(Q.Elements.PrioritySorted) > 0 && len(Q.ExecElements) < Q.SimultaneousLimit {
+			e := Q.Elements.Pop()
+			Q.ExecLock.Lock()
+			Q.ExecElements = append(Q.ExecElements, e)
+			Q.ExecLock.Unlock()
+			go Q.Exec(e)
+		}
+		Q.Lock.Unlock()
 	}
-}
-
-func (Q *Queue) Stop() {
-	Q.Lock.Lock(); defer Q.Lock.Unlock()
-	Q.ExecLock.Lock(); defer Q.ExecLock.Unlock()
-	Q.stop = true
 }

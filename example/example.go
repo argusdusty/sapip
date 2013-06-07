@@ -2,28 +2,47 @@ package main
 
 import (
 	"github.com/argusdusty/sapip"
+	"strings"
 	"time"
-	"strconv"
 )
 
 var ExampleQueue = new(sapip.Queue)
-const ExampleDelay = 1000*time.Millisecond
+
+const ExampleDelay = 1000 * time.Millisecond
 const ExampleSimultaneousLimit = 100
 
+type Element struct {
+	Name     string
+	Data     string
+	Priority int
+}
+
+var Data = []Element{
+	Element{"1", "a", 2},
+	Element{"1", "b", 3},
+	Element{"2", "a", 2},
+	Element{"2", "a", 1},
+	Element{"3", "a", 2},
+	Element{"3", "a", 3},
+	Element{"4", "a", 2},
+	Element{"4", "a", 2},
+	Element{"5", "a", 2},
+	Element{"5", "b", 2},
+	Element{"6", "b", 2},
+	Element{"6", "a", 2},
+}
+
 func init() {
-	ExampleQueue.Init(ExampleDelay, ExampleSimultaneousLimit)
+	ExampleCommand := func(data []string) string { return strings.Join(data, " ") + " Done!" }
+	go ExampleQueue.InitAndRun(ExampleDelay, ExampleSimultaneousLimit, ExampleCommand)
 }
 
 func main() {
-	ExampleCommand := func(input string) string { return input + " Done!" }
-	for i := 10; i > 0; i-- {
-		r, index := ExampleQueue.AddElement("Testing: " + string(byte(i + 96)), ExampleCommand, i)
-		print("Insert: " + string(byte(i + 96)), " at position: " + strconv.Itoa(index), " \n")
-		go func() { print(r.Read(), "\n") }()
+	for _, e := range Data {
+		sr, i := ExampleQueue.AddElement(e.Name, e.Data, e.Priority)
+		print("Insert: Name: ", e.Name, "Data: ", e.Data, "Priority: ", e.Priority, "Index: ", i)
+		go func() { print(sr.Read(), "\n") }()
 	}
-	r, index := ExampleQueue.AddElement("Testing: Error", func(input string) string { panic(input); return input + " Done!" }, 5)
-	print("Insert: Error", " at position: " + strconv.Itoa(index), " \n")
-	go func() { print(r.Read(), "\n") }()
-	time.Sleep(10*time.Second)
+	time.Sleep(13 * time.Second)
 	return
 }
