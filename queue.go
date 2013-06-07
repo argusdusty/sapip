@@ -36,16 +36,16 @@ type Queue struct {
 	Elements          DoubleSortedElements
 	ExecElements      []Element
 	SimultaneousLimit int
-	Function          func(data []string) string
+	Function          func(name string, data []string) string
 	stop              bool
 }
 
-func (Q *Queue) InitAndRun(Time time.Duration, SimultaneousLimit int, Function func(data []string) string) {
+func (Q *Queue) InitAndRun(Time time.Duration, SimultaneousLimit int, Function func(name string, data []string) string) {
 	Q.Init(SimultaneousLimit, Function)
 	Q.Run(Time)
 }
 
-func (Q *Queue) Init(SimultaneousLimit int, Function func(data []string) string) {
+func (Q *Queue) Init(SimultaneousLimit int, Function func(name string, data []string) string) {
 	Q.Lock = new(sync.Mutex)
 	Q.ExecLock = new(sync.Mutex)
 	Q.Elements = DoubleSortedElements{make(map[string]int, 0), make([]Element, 0)}
@@ -134,7 +134,7 @@ func (Q *Queue) Exec(e Element) {
 	}()
 	r := ""
 	defer func() { e.OutChannel.Return(r) }()
-	r = Q.Function(e.Data)
+	r = Q.Function(e.Name, e.Data)
 }
 
 func (Q *Queue) Run(Wait time.Duration) {

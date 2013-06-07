@@ -33,7 +33,7 @@ var Data = []Element{
 }
 
 func init() {
-	ExampleCommand := func(data []string) string { return strings.Join(data, " ") + " Done!" }
+	ExampleCommand := func(name string, data []string) string { return strings.Join(data, " ") + " Done!" }
 	go ExampleQueue.InitAndRun(ExampleDelay, ExampleSimultaneousLimit, ExampleCommand)
 }
 
