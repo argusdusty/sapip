@@ -29,7 +29,7 @@ var Data = []SElement{
 	SElement{"7", "a", 0},
 }
 
-var ExampleQueue = new(Queue)
+var ExampleQueue = new(sapip.Queue)
 
 const ExampleDelay = 1000 * time.Millisecond
 const ExampleSimultaneousLimit = 100
