@@ -27,6 +27,9 @@ var Data = []SElement{
 	SElement{"6", "a", 1},
 	SElement{"7", "b", 1},
 	SElement{"7", "a", 0},
+	SElement{"8", "a", 1},
+	SElement{"8", "b", 0},
+	SElement{"8", "c", 2},
 }
 
 var ExampleQueue = new(sapip.Queue)
@@ -42,8 +45,8 @@ func init() {
 
 func main() {
 	for _, e := range Data {
-		sr, i := ExampleQueue.AddElement(e.Name, e.Data, e.Priority)
-		print("Insert: Name: ", e.Name, " Data: ", e.Data, " Priority: ", e.Priority, " Index: ", i, "\n")
+		sr := ExampleQueue.AddElement(e.Name, e.Data, e.Priority)
+		print("Insert: Name: ", e.Name, " Data: ", e.Data, " Priority: ", e.Priority, "\n")
 		go func() { print(sr.Read(), "\n") }()
 	}
 	time.Sleep(10 * time.Second)

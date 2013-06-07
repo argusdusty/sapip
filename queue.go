@@ -2,21 +2,14 @@ package sapip
 
 import (
 	"log"
-	"sort"
 	"sync"
 	"time"
 )
 
-// Allows multiple threads to read a single value from this with .Read(), which blocks until a return value is sent
 type SafeReturn chan string
 
 func (SR SafeReturn) Return(value string) { SR <- value }
 func (SR SafeReturn) Read() string        { value := <-SR; SR <- value; return value }
-
-type ReducedElement struct {
-	Priority   int
-	OutChannel SafeReturn
-}
 
 type Element struct {
 	Name       string
@@ -26,8 +19,9 @@ type Element struct {
 }
 
 type DoubleSortedElements struct {
-	NameIndex      map[string]int
-	PrioritySorted []Element
+	NameIndex   map[string]int
+	PriorityMap map[int][]Element
+	Priorities  []int // In order
 }
 
 type Queue struct {
@@ -37,65 +31,109 @@ type Queue struct {
 	ExecElements      []Element
 	SimultaneousLimit int
 	Function          func(name string, data []string) string
-	stop              bool
+	Stopped           bool
 }
 
 func (Q *Queue) Init(SimultaneousLimit int, Function func(name string, data []string) string) {
 	Q.Lock = new(sync.Mutex)
 	Q.ExecLock = new(sync.Mutex)
-	Q.Elements = DoubleSortedElements{make(map[string]int, 0), make([]Element, 0)}
+	Q.Elements = DoubleSortedElements{make(map[string]int, 0), make(map[int][]Element, 0), make([]int, 0)}
 	Q.ExecElements = make([]Element, 0)
 	Q.SimultaneousLimit = SimultaneousLimit
 	Q.Function = Function
-	Q.stop = false
+	Q.Stopped = false
 }
 
-func (D *DoubleSortedElements) AddElement(Name, Data string, Priority int) (SafeReturn, int) {
-	p, ok := D.NameIndex[Name]
-	if ok {
-		j := sort.Search(len(D.PrioritySorted), func(j int) bool { return D.PrioritySorted[j].Priority >= p })
-		for D.PrioritySorted[j].Name != Name {
+func (D *DoubleSortedElements) AddPriority(Priority int) {
+	i := 0
+	j := len(D.Priorities)
+	for i < j {
+		h := (i + j) >> 1
+		if D.Priorities[h] < Priority {
+			i = h + 1
+		} else {
+			j = h
+		}
+	}
+	D.Priorities = append(D.Priorities[:i], append([]int{Priority}, D.Priorities[i:]...)...)
+}
+
+func (D *DoubleSortedElements) AddElement(Name, Data string, Priority int) SafeReturn {
+	if p, ok := D.NameIndex[Name]; ok {
+		elements := D.PriorityMap[p]
+		j := 0
+		for elements[j].Name != Name {
 			j++
 		}
 		found := false
-		for _, d := range D.PrioritySorted[j].Data {
+		for _, d := range elements[j].Data {
 			if d == Data {
 				found = true
 				break
 			}
 		}
 		if p > Priority {
-			BaseData := D.PrioritySorted[j].Data
+			BaseData := elements[j].Data
 			if !found {
 				BaseData = append(BaseData, Data)
 			}
 			D.NameIndex[Name] = Priority
-			OutChannel := D.PrioritySorted[j].OutChannel
-			D.PrioritySorted = append(D.PrioritySorted[:j], D.PrioritySorted[j+1:]...)
-			k := sort.Search(len(D.PrioritySorted), func(k int) bool { return D.PrioritySorted[k].Priority > Priority })
-			D.PrioritySorted = append(D.PrioritySorted[:k], append([]Element{Element{Name, BaseData, Priority, OutChannel}}, D.PrioritySorted[k:]...)...)
-			return OutChannel, k + 1
+			OutChannel := elements[j].OutChannel
+			elements = append(elements[:j], elements[j+1:]...)
+			if a, ok := D.PriorityMap[Priority]; ok {
+				D.PriorityMap[Priority] = append(a, Element{Name, BaseData, Priority, OutChannel})
+			} else {
+				D.AddPriority(Priority)
+				D.PriorityMap[Priority] = []Element{Element{Name, BaseData, Priority, OutChannel}}
+			}
+			if len(elements) == 0 {
+				i := 0
+				j := len(D.Priorities)
+				for i < j {
+					h := (i + j) >> 1
+					if D.Priorities[h] < p {
+						i = h + 1
+					} else {
+						j = h
+					}
+				}
+				D.Priorities = append(D.Priorities[:i], D.Priorities[i+1:]...)
+				delete(D.PriorityMap, p)
+			} else {
+				D.PriorityMap[p] = elements
+			}
+			return OutChannel
 		}
 		if !found {
-			D.PrioritySorted[j].Data = append(D.PrioritySorted[j].Data, Data)
+			elements[j].Data = append(elements[j].Data, Data)
 		}
-		return D.PrioritySorted[j].OutChannel, j + 1
+		return elements[j].OutChannel
 	}
-	j := sort.Search(len(D.PrioritySorted), func(j int) bool { return D.PrioritySorted[j].Priority > Priority })
 	e := Element{Name, []string{Data}, Priority, make(SafeReturn, 1)}
-	D.PrioritySorted = append(D.PrioritySorted[:j], append([]Element{e}, D.PrioritySorted[j:]...)...)
 	D.NameIndex[Name] = Priority
-	return e.OutChannel, j + 1
+	if a, ok := D.PriorityMap[Priority]; ok {
+		D.PriorityMap[Priority] = append(a, e)
+	} else {
+		D.AddPriority(Priority)
+		D.PriorityMap[Priority] = []Element{e}
+	}
+	return e.OutChannel
 }
 
 func (D *DoubleSortedElements) Pop() Element {
-	e := D.PrioritySorted[0]
-	D.PrioritySorted = D.PrioritySorted[1:]
+	elements := D.PriorityMap[D.Priorities[0]]
+	e := elements[0]
+	if len(elements) == 1 {
+		delete(D.PriorityMap, D.Priorities[0])
+		D.Priorities = D.Priorities[1:]
+	} else {
+		D.PriorityMap[D.Priorities[0]] = elements[1:]
+	}
 	delete(D.NameIndex, e.Name)
 	return e
 }
 
-func (Q *Queue) AddElement(Name, Data string, Priority int) (SafeReturn, int) {
+func (Q *Queue) AddElement(Name, Data string, Priority int) SafeReturn {
 	Q.Lock.Lock()
 	defer Q.Lock.Unlock()
 	Q.ExecLock.Lock()
@@ -104,7 +142,7 @@ func (Q *Queue) AddElement(Name, Data string, Priority int) (SafeReturn, int) {
 		if Name == e.Name {
 			for _, d := range e.Data {
 				if d == Data {
-					return e.OutChannel, 0
+					return e.OutChannel
 				}
 			}
 		}
@@ -132,6 +170,14 @@ func (Q *Queue) Exec(e Element) {
 	r = Q.Function(e.Name, e.Data)
 }
 
+func (Q *Queue) Stop() {
+	Q.Lock.Lock()
+	defer Q.Lock.Unlock()
+	Q.ExecLock.Lock()
+	defer Q.ExecLock.Unlock()
+	Q.Stopped = true
+}
+
 func (Q *Queue) Run(Wait time.Duration) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -140,11 +186,11 @@ func (Q *Queue) Run(Wait time.Duration) {
 	}()
 	a := time.Tick(Wait)
 	for _ = range a {
-		if Q.stop {
+		if Q.Stopped {
 			break
 		}
 		Q.Lock.Lock()
-		if len(Q.Elements.PrioritySorted) > 0 && len(Q.ExecElements) < Q.SimultaneousLimit {
+		if len(Q.Elements.Priorities) > 0 && len(Q.ExecElements) < Q.SimultaneousLimit {
 			e := Q.Elements.Pop()
 			Q.ExecLock.Lock()
 			Q.ExecElements = append(Q.ExecElements, e)
