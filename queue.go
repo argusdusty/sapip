@@ -40,11 +40,6 @@ type Queue struct {
 	stop              bool
 }
 
-func (Q *Queue) InitAndRun(Time time.Duration, SimultaneousLimit int, Function func(name string, data []string) string) {
-	Q.Init(SimultaneousLimit, Function)
-	Q.Run(Time)
-}
-
 func (Q *Queue) Init(SimultaneousLimit int, Function func(name string, data []string) string) {
 	Q.Lock = new(sync.Mutex)
 	Q.ExecLock = new(sync.Mutex)
@@ -75,11 +70,11 @@ func (D *DoubleSortedElements) AddElement(Name, Data string, Priority int) (Safe
 				BaseData = append(BaseData, Data)
 			}
 			D.NameIndex[Name] = Priority
+			OutChannel := D.PrioritySorted[j].OutChannel
 			D.PrioritySorted = append(D.PrioritySorted[:j], D.PrioritySorted[j+1:]...)
 			k := sort.Search(len(D.PrioritySorted), func(k int) bool { return D.PrioritySorted[k].Priority > Priority })
-			e := Element{Name, BaseData, Priority, make(SafeReturn, 1)}
-			D.PrioritySorted = append(D.PrioritySorted[:k], append([]Element{e}, D.PrioritySorted[k:]...)...)
-			return e.OutChannel, k + 1
+			D.PrioritySorted = append(D.PrioritySorted[:k], append([]Element{Element{Name, BaseData, Priority, OutChannel}}, D.PrioritySorted[k:]...)...)
+			return OutChannel, k + 1
 		}
 		if !found {
 			D.PrioritySorted[j].Data = append(D.PrioritySorted[j].Data, Data)
