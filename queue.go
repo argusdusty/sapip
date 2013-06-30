@@ -174,17 +174,6 @@ func (D *DoubleSortedElements) Pop() *Element {
 func (Q *Queue) AddElement(Name, Data string, Priority int) SafeReturn {
 	Q.Lock.Lock()
 	defer Q.Lock.Unlock()
-	Q.ExecLock.Lock()
-	defer Q.ExecLock.Unlock()
-	for _, e := range Q.ExecElements {
-		if Name == e.Name {
-			for _, d := range e.Data {
-				if d == Data {
-					return e.OutChannel
-				}
-			}
-		}
-	}
 	return Q.Elements.AddElement(Name, Data, Priority)
 }
 
