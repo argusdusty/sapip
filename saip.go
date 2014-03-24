@@ -3,7 +3,6 @@ package sapip
 import (
 	"log"
 	"sync"
-	"time"
 )
 
 type SAIPQueue struct {
@@ -73,9 +72,8 @@ func (Q *SAIPQueue) Stop() {
 	Q.Stopped = true
 }
 
-func (Q *SAIPQueue) Run(Wait time.Duration) {
-	a := time.Tick(Wait)
-	for _ = range a {
+func (Q *SAIPQueue) Run() {
+	for {
 		if Q.Stopped {
 			break
 		}
