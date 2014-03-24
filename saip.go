@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-type Queue struct {
+type SAIPQueue struct {
 	Lock              *sync.Mutex // Global lock
 	ExecLock          *sync.Mutex // Lock for manipulating ExecElements
 	EmptyCond         *sync.Cond  // Wait for queue to be non-empty
@@ -18,9 +18,7 @@ type Queue struct {
 	Stopped           bool
 }
 
-type SAPIPQueue Queue
-
-func (Q *Queue) Init(SimultaneousLimit int, Function func(name string, data []string) string) {
+func (Q *SAIPQueue) Init(SimultaneousLimit int, Function func(name string, data []string) string) {
 	Q.Lock = new(sync.Mutex)
 	Q.ExecLock = new(sync.Mutex)
 	Q.EmptyCond = sync.NewCond(new(sync.Mutex))
@@ -32,7 +30,7 @@ func (Q *Queue) Init(SimultaneousLimit int, Function func(name string, data []st
 	Q.Stopped = false
 }
 
-func (Q *Queue) AddElement(Name, Data string, Priority int) SafeReturn {
+func (Q *SAIPQueue) AddElement(Name, Data string, Priority int) SafeReturn {
 	Q.Lock.Lock()
 	defer Q.Lock.Unlock()
 	// Add the element
@@ -44,7 +42,7 @@ func (Q *Queue) AddElement(Name, Data string, Priority int) SafeReturn {
 	return SR
 }
 
-func (Q *Queue) Exec(e *PriorityElement) {
+func (Q *SAIPQueue) Exec(e *PriorityElement) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Println("Error in queue on element:", e.Name, "-", r)
@@ -69,13 +67,13 @@ func (Q *Queue) Exec(e *PriorityElement) {
 	r = Q.Function(e.Name, e.Data)
 }
 
-func (Q *Queue) Stop() {
+func (Q *SAIPQueue) Stop() {
 	Q.Lock.Lock()
 	defer Q.Lock.Unlock()
 	Q.Stopped = true
 }
 
-func (Q *Queue) Run(Wait time.Duration) {
+func (Q *SAIPQueue) Run(Wait time.Duration) {
 	a := time.Tick(Wait)
 	for _ = range a {
 		if Q.Stopped {
