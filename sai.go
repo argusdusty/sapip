@@ -52,9 +52,9 @@ func (Q *SAIQueue) Exec(e *Element) {
 				break
 			}
 		}
-		Q.EmptyCond.L.Lock()
-		defer Q.EmptyCond.L.Unlock()
-		Q.EmptyCond.Broadcast()
+		Q.LimitCond.L.Lock()
+		defer Q.LimitCond.L.Unlock()
+		Q.LimitCond.Broadcast()
 	}()
 	r := ""
 	defer func() { e.OutChannel.Return(r) }()

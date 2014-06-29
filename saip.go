@@ -55,10 +55,9 @@ func (Q *SAIPQueue) Exec(e *PriorityElement) {
 				break
 			}
 		}
-		// Broadcast the now empty slot in ExecElements
-		Q.EmptyCond.L.Lock()
-		defer Q.EmptyCond.L.Unlock()
-		Q.EmptyCond.Broadcast()
+		Q.LimitCond.L.Lock()
+		defer Q.LimitCond.L.Unlock()
+		Q.LimitCond.Broadcast()
 	}()
 	// Execute the function and return it in a defer (in case it panics)
 	r := ""
