@@ -32,9 +32,7 @@ func (Q *SAIPQueue) Init(SimultaneousLimit int, Function func(name string, data 
 func (Q *SAIPQueue) AddElement(Name, Data string, Priority int) SafeReturn {
 	Q.Lock.Lock()
 	defer Q.Lock.Unlock()
-	// Add the element
 	SR := Q.Elements.AddElement(Name, Data, Priority)
-	// Broadcast that the queue might be non-empty
 	Q.EmptyCond.L.Lock()
 	defer Q.EmptyCond.L.Unlock()
 	Q.EmptyCond.Broadcast()
@@ -46,7 +44,6 @@ func (Q *SAIPQueue) Exec(e *PriorityElement) {
 		if r := recover(); r != nil {
 			log.Println("Error in queue on element:", e.Name, "-", r)
 		}
-		// Remove the element
 		Q.ExecLock.Lock()
 		defer Q.ExecLock.Unlock()
 		for i, elem := range Q.ExecElements {
@@ -59,7 +56,6 @@ func (Q *SAIPQueue) Exec(e *PriorityElement) {
 		defer Q.LimitCond.L.Unlock()
 		Q.LimitCond.Broadcast()
 	}()
-	// Execute the function and return it in a defer (in case it panics)
 	r := ""
 	defer func() { e.OutChannel.Return(r) }()
 	r = Q.Function(e.Name, e.Data)
