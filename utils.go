@@ -31,7 +31,7 @@ type IndexedElements struct {
 
 var logFunc func(v ...interface{}) = log.Println
 
-func setLogFunc(f func(v ...interface{})) {
+func SetLogFunc(f func(v ...interface{})) {
 	logFunc = f
 }
 
