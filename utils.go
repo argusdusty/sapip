@@ -1,5 +1,7 @@
 package sapip
 
+import "log"
+
 type SafeReturn chan string
 
 func (SR SafeReturn) Return(value string) { SR <- value }
