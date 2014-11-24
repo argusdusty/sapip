@@ -27,6 +27,12 @@ type IndexedElements struct {
 	End       *Element            // Last element
 }
 
+var logFunc func(v ...interface{}) = log.Println
+
+func setLogFunc(f func(v ...interface{})) {
+	logFunc = f
+}
+
 func (D *IndexedElements) AddElement(Name, Data string) SafeReturn {
 	if p, ok := D.NameIndex[Name]; ok {
 		found := false

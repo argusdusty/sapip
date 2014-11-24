@@ -1,7 +1,6 @@
 package sapip
 
 import (
-	"log"
 	"sync"
 )
 
@@ -42,7 +41,7 @@ func (Q *SAIPQueue) AddElement(Name, Data string, Priority int) SafeReturn {
 func (Q *SAIPQueue) Exec(e *PriorityElement) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println("Error in queue on element:", e.Name, "-", r)
+			logFunc("Error in queue on element:", e.Name, "-", r)
 		}
 		Q.ExecLock.Lock()
 		defer Q.ExecLock.Unlock()

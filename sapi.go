@@ -1,7 +1,6 @@
 package sapip
 
 import (
-	"log"
 	"sync"
 	"time"
 )
@@ -43,7 +42,7 @@ func (Q *SAPIQueue) AddElement(Name, Data string) SafeReturn {
 func (Q *SAPIQueue) Exec(e *Element) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println("Error in queue on element:", e.Name, "-", r)
+			logFunc("Error in queue on element:", e.Name, "-", r)
 		}
 		Q.ExecLock.Lock()
 		defer Q.ExecLock.Unlock()
