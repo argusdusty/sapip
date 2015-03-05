@@ -30,47 +30,51 @@ Example usage
 
 You have an API that restricts you to a certain rate limit (2 API calls/second, for example), and certain API calls should be run at a higher priority (for example, user requests > background calls):
 
-    var APIQueue = sapip.NewSAPIPQueue(HandleAPICall, 8)
-    
-    func init() {
-    	// You may want to add a small buffer onto the 500ms
-    	go APIQueue.Run(500*time.Millisecond)
-    }
-    
-    // Ignore data
-    func HandleAPICall(command string, data []string) string {
-    	return execAPICall(command)
-    }
-    
-    // Lowest priority runs first
-    func APICall(command string, priority int) string {
-    	reader := APIQueue.AddElement(command, "", priority)
-    	return reader.Read()
-    }
+```go
+var APIQueue = sapip.NewSAPIPQueue(HandleAPICall, 8)
+
+func init() {
+	// You may want to add a small buffer onto the 500ms
+	go APIQueue.Run(500*time.Millisecond)
+}
+
+// Ignore data
+func HandleAPICall(command string, data []string) string {
+	return execAPICall(command)
+}
+
+// Lowest priority runs first
+func APICall(command string, priority int) string {
+	reader := APIQueue.AddElement(command, "", priority)
+	return reader.Read()
+}
+```
 
 You have a data structure that must be loaded from the DB and analyzed in order to be modified, and there are several possible modifications that can be made. You want this to run as fast as possible, including running multiple modifications to the same object together so that you don't have to reload the object each time, but you want to avoid having the same object being accessed simultaneously.
 
-    var ObjectQueue = sapip.NewSAIQueue(HandleModifyObject, 8)
-    
-    func init() {
-    	go ObjectQueue.Run()
-    }
-    
-    func HandleModifyObject(objectKey string, modifications []string) string {
-    	object := loadObject(objectKey)
-    	for _, modification := range modifications {
-    		RunModification(object, modification)
-    	}
-    	saveObject(object, objectKey)
-    	return ""
-    }
-    
-    func ModifyObject(objectKey string, modification string, waitFinish bool) {
-    	reader := ObjectQueue.AddElement(objectKey, modification)
-    	// We can choose to not wait for the changes to complete, and let them run in the background
-    	if waitFinish {
-    		reader.Read()
-    	}
-    }
+```go
+var ObjectQueue = sapip.NewSAIQueue(HandleModifyObject, 8)
+
+func init() {
+	go ObjectQueue.Run()
+}
+
+func HandleModifyObject(objectKey string, modifications []string) string {
+	object := loadObject(objectKey)
+	for _, modification := range modifications {
+		RunModification(object, modification)
+	}
+	saveObject(object, objectKey)
+	return ""
+}
+
+func ModifyObject(objectKey string, modification string, waitFinish bool) {
+	reader := ObjectQueue.AddElement(objectKey, modification)
+	// We can choose to not wait for the changes to complete, and let them run in the background
+	if waitFinish {
+		reader.Read()
+	}
+}
+```
 
 Copyright (C) 2015  Mark Canning
