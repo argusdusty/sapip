@@ -1,3 +1,20 @@
+// Copyright (C) 2015  Mark Canning
+// Author: Argusdusty (Mark Canning)
+// Email: argusdusty@gmail.com
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 package main
 
 import (
@@ -12,7 +29,10 @@ type SElement struct {
 	Priority int
 }
 
-var Data = []SElement{
+const ExampleDelay = 100 * time.Millisecond
+const ExampleSimultaneousLimit = 10
+
+var ExampleData = []SElement{
 	SElement{"1", "a", 2},
 	SElement{"1", "b", 3},
 	SElement{"2", "a", 2},
@@ -32,54 +52,50 @@ var Data = []SElement{
 	SElement{"8", "c", 2},
 }
 
-var ExampleQueue = new(sapip.Queue)
-var ExampleSAIPQueue = new(sapip.SAIPQueue)
-var ExampleSAPIQueue = new(sapip.SAPIQueue)
-var ExampleSAIQueue = new(sapip.SAIQueue)
+var FullDelay = ExampleDelay * time.Duration(len(ExampleData))
 
-const ExampleDelay = 100 * time.Millisecond
-const ExampleSimultaneousLimit = 100
+func ExampleCommand(name string, data []string) string {
+	println(name, strings.Join(data, " "), "Executing!")
+	return name + " " + strings.Join(data, " ") + " Finished!"
+}
 
-func init() {
-	ExampleCommand := func(name string, data []string) string { return name + " " + strings.Join(data, " ") + " Done!" }
-	ExampleQueue.Init(ExampleSimultaneousLimit, ExampleCommand)
-	ExampleSAIPQueue.Init(ExampleSimultaneousLimit, ExampleCommand)
-	ExampleSAPIQueue.Init(ExampleSimultaneousLimit, ExampleCommand)
-	ExampleSAIQueue.Init(ExampleSimultaneousLimit, ExampleCommand)
-	go ExampleQueue.Run(ExampleDelay)
+var ExampleSAPIPQueue = sapip.NewSAPIPQueue(ExampleCommand, ExampleSimultaneousLimit)
+var ExampleSAIPQueue = sapip.NewSAIPQueue(ExampleCommand, ExampleSimultaneousLimit)
+var ExampleSAPIQueue = sapip.NewSAPIQueue(ExampleCommand, ExampleSimultaneousLimit)
+var ExampleSAIQueue = sapip.NewSAIQueue(ExampleCommand, ExampleSimultaneousLimit)
+
+func main() {
+	go ExampleSAPIPQueue.Run(ExampleDelay)
 	go ExampleSAIPQueue.Run()
 	go ExampleSAPIQueue.Run(ExampleDelay)
 	go ExampleSAIQueue.Run()
-}
-
-func main() {
 	print("Testing SAPIP queue\n")
-	for _, e := range Data {
-		sr := ExampleQueue.AddElement(e.Name, e.Data, e.Priority)
-		print("Insert: Name: ", e.Name, " Data: ", e.Data, " Priority: ", e.Priority, "\n")
-		go func() { print(sr.Read(), "\n") }()
+	for _, e := range ExampleData {
+		sr := ExampleSAPIPQueue.AddElement(e.Name, e.Data, e.Priority)
+		println("Insert: Name:", e.Name, "Data:", e.Data, "Priority:", e.Priority)
+		go func() { println("SAPIP:", sr.Read()) }()
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(FullDelay)
 	print("Testing SAIP queue\n")
-	for _, e := range Data {
+	for _, e := range ExampleData {
 		sr := ExampleSAIPQueue.AddElement(e.Name, e.Data, e.Priority)
-		print("Insert: Name: ", e.Name, " Data: ", e.Data, " Priority: ", e.Priority, "\n")
-		go func() { print(sr.Read(), "\n") }()
+		println("Insert: Name:", e.Name, "Data:", e.Data, "Priority:", e.Priority)
+		go func() { println("SAIP:", sr.Read()) }()
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(FullDelay)
 	print("Testing SAPI queue\n")
-	for _, e := range Data {
+	for _, e := range ExampleData {
 		sr := ExampleSAPIQueue.AddElement(e.Name, e.Data)
-		print("Insert: Name: ", e.Name, " Data: ", e.Data, "\n")
-		go func() { print(sr.Read(), "\n") }()
+		println("Insert: Name:", e.Name, "Data:", e.Data)
+		go func() { println("SAPI:", sr.Read()) }()
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(FullDelay)
 	print("Testing SAI queue\n")
-	for _, e := range Data {
+	for _, e := range ExampleData {
 		sr := ExampleSAIQueue.AddElement(e.Name, e.Data)
-		print("Insert: Name: ", e.Name, " Data: ", e.Data, "\n")
-		go func() { print(sr.Read(), "\n") }()
+		println("Insert: Name:", e.Name, "Data:", e.Data)
+		go func() { println("SAI:", sr.Read()) }()
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(FullDelay)
 	return
 }

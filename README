@@ -6,8 +6,53 @@ Indexed: Each command is uniquely defined by a string, which can allow log-time 
 Priority: Lowest priority command goes first. Supports multiple commands having the same priority.
 Queue: First in, first out, under a given priority.
 
-Commands are functions which take a string (their name) as input and return a string. Feel free to modify those data types to support other return/input values. I didn't want to use the generalized interface{} for performance reasons.
+Author: Argusdusty (Mark Canning)
+Email: argusdusty@gmail.com
+Copyright (C) 2015  Mark Canning
 
-License: CC BY-SA 3.0 (http://creativecommons.org/licenses/by-sa/3.0/)
-You are free to share and remix this work, as long as you attribute the original author, and share it under a similar license
-Author: Mark Canning
+The queue functions take a string (their name) and a list a strings (set of commands to be run under the name) as input and return a string. Feel free to modify those data types to support other return/input values. I didn't want to use the generalized interface{} for performance reasons.
+
+Example usage:
+
+You have an API that restricts you to a certain rate limit (1 API call every 500ms, for example), and certain API calls should be run at a higher priority (for example, user requests > background calls):
+
+	var APIQueue = sapip.NewSAPIPQueue(HandleAPICall, 8)
+
+	func init() {
+		// You may want to add a small buffer onto the 500ms
+		go APIQueue.Run(500*time.Millisecond)
+	}
+
+	// Ignore data
+	func HandleAPICall(command string, data []string) string {
+		return execAPICall(command)
+	}
+
+	func APICall(command string, priority int) string {
+		reader := APIQueue.AddElement(command, "", priority)
+		return reader.Read()
+	}
+
+You have a data structure that must be loaded from the DB and analyzed in order to be modified, and there are several possible modifications that can be made. You want this to run as fast as possible, including running multiple modifications to the same object together so that you don't have to reload the object each time, but you want to avoid having the same object being accessed simultaneously.
+
+	var ObjectQueue = sapip.NewSAIQueue(HandleModifyObject, 8)
+
+	func init() {
+		go ObjectQueue.Run()
+	}
+
+	func HandleModifyObject(objectKey string, modifications []string) string {
+		object := loadObject(objectKey)
+		for _, modification := range modifications {
+			RunModification(object, modification)
+		}
+		saveObject(object, objectKey)
+		return ""
+	}
+
+	func ModifyObject(objectKey string, modification string, waitFinish bool) {
+		reader := ObjectQueue.AddElement(objectKey, modification)
+		if waitFinish {
+			reader.Read()
+		}
+	}
