@@ -15,7 +15,7 @@ SAIPQueue - A priority queue that runs commands as fast as possible. <br>
 SAPIQueue - A periodic queue without priorities that runs commands at set intervals. <br>
 SAIQueue - A bare-bones queue without priorities that runs commands as fast as possible. <br>
 
-***Author:*** Mark Canning <br>
+***Author:*** Argusdusty (Mark Canning) <br>
 ***Email:*** argusdusty@gmail.com <br>
 ***Developed at/for:*** [Tamber](http://tamber.com/)
 
