@@ -146,6 +146,18 @@ func (Q *SAPIQueue) Stop() {
 	Q.stopped = true
 }
 
+// Returns the number of elements waiting in the queue, and
+// the number of currently executing elements
+func (Q *SAPIQueue) NumElements() (num int, execNum int) {
+	Q.lock.Lock()
+	Q.execLock.Lock()
+	defer Q.execLock.Unlock()
+	defer Q.lock.Unlock()
+	num = len(Q.elements.NameIndex)
+	execNum = len(Q.execElements)
+	return
+}
+
 // Run the queue, executing elements over set intervals
 // Will loop forever (until stopped), so spawn this in a new thread
 func (Q *SAPIQueue) Run(Wait time.Duration) {
