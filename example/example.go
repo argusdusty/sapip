@@ -18,6 +18,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/argusdusty/sapip"
 	"strings"
 	"time"
@@ -55,7 +56,7 @@ var ExampleData = []SElement{
 var FullDelay = ExampleDelay * time.Duration(len(ExampleData))
 
 func ExampleCommand(name string, data []string) string {
-	println(name, strings.Join(data, " "), "Executing!")
+	fmt.Println(time.Now(), name, strings.Join(data, " "), "Executing!")
 	return name + " " + strings.Join(data, " ") + " Finished!"
 }
 
@@ -69,32 +70,32 @@ func main() {
 	go ExampleSAIPQueue.Run()
 	go ExampleSAPIQueue.Run(ExampleDelay)
 	go ExampleSAIQueue.Run()
-	print("Testing SAPIP queue\n")
+	fmt.Println(time.Now(), "Testing SAPIP queue")
 	for _, e := range ExampleData {
 		sr := ExampleSAPIPQueue.AddElement(e.Name, e.Data, e.Priority)
-		println("Insert: Name:", e.Name, "Data:", e.Data, "Priority:", e.Priority)
-		go func() { println("SAPIP:", sr.Read()) }()
+		fmt.Println(time.Now(), "Insert: Name:", e.Name, "Data:", e.Data, "Priority:", e.Priority)
+		go func() { fmt.Println(time.Now(), "SAPIP:", sr.Read()) }()
 	}
 	time.Sleep(FullDelay)
-	print("Testing SAIP queue\n")
+	fmt.Println(time.Now(), "Testing SAIP queue")
 	for _, e := range ExampleData {
 		sr := ExampleSAIPQueue.AddElement(e.Name, e.Data, e.Priority)
-		println("Insert: Name:", e.Name, "Data:", e.Data, "Priority:", e.Priority)
-		go func() { println("SAIP:", sr.Read()) }()
+		fmt.Println(time.Now(), "Insert: Name:", e.Name, "Data:", e.Data, "Priority:", e.Priority)
+		go func() { fmt.Println(time.Now(), "SAIP:", sr.Read()) }()
 	}
 	time.Sleep(FullDelay)
-	print("Testing SAPI queue\n")
+	fmt.Println(time.Now(), "Testing SAPI queue")
 	for _, e := range ExampleData {
 		sr := ExampleSAPIQueue.AddElement(e.Name, e.Data)
-		println("Insert: Name:", e.Name, "Data:", e.Data)
-		go func() { println("SAPI:", sr.Read()) }()
+		fmt.Println(time.Now(), "Insert: Name:", e.Name, "Data:", e.Data)
+		go func() { fmt.Println(time.Now(), "SAPI:", sr.Read()) }()
 	}
 	time.Sleep(FullDelay)
-	print("Testing SAI queue\n")
+	fmt.Println(time.Now(), "Testing SAI queue")
 	for _, e := range ExampleData {
 		sr := ExampleSAIQueue.AddElement(e.Name, e.Data)
-		println("Insert: Name:", e.Name, "Data:", e.Data)
-		go func() { println("SAI:", sr.Read()) }()
+		fmt.Println(time.Now(), "Insert: Name:", e.Name, "Data:", e.Data)
+		go func() { fmt.Println(time.Now(), "SAI:", sr.Read()) }()
 	}
 	time.Sleep(FullDelay)
 	return
