@@ -70,11 +70,11 @@ func TestSapip(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	for _, e := range ExampleData {
 		sr := ExampleSAPIPQueue.AddElement(e.Name, e.Data, e.Priority)
-		fmt.Println("Insert: Name:", e.Name, "Data:", e.Data, "Priority:", e.Priority)
+		fmt.Println("Insert: Name:", string(e.Name), "Data:", string(e.Data), "Priority:", e.Priority)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			fmt.Println("SAPIP:", sr.Read())
+			fmt.Println("SAPIP:", string(sr.Read()))
 		}()
 	}
 	wg.Wait()
@@ -87,11 +87,11 @@ func TestSaip(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	for _, e := range ExampleData {
 		sr := ExampleSAIPQueue.AddElement(e.Name, e.Data, e.Priority)
-		fmt.Println("Insert: Name:", e.Name, "Data:", e.Data, "Priority:", e.Priority)
+		fmt.Println("Insert: Name:", string(e.Name), "Data:", string(e.Data), "Priority:", e.Priority)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			fmt.Println("SAIP:", sr.Read())
+			fmt.Println("SAIP:", string(sr.Read()))
 		}()
 	}
 	wg.Wait()
@@ -104,11 +104,11 @@ func TestSapi(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	for _, e := range ExampleData {
 		sr := ExampleSAPIQueue.AddElement(e.Name, e.Data)
-		fmt.Println("Insert: Name:", e.Name, "Data:", e.Data)
+		fmt.Println("Insert: Name:", string(e.Name), "Data:", string(e.Data))
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			fmt.Println("SAPI:", sr.Read())
+			fmt.Println("SAPI:", string(sr.Read()))
 		}()
 	}
 	wg.Wait()
@@ -121,11 +121,11 @@ func TestSai(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	for _, e := range ExampleData {
 		sr := ExampleSAIQueue.AddElement(e.Name, e.Data)
-		fmt.Println("Insert: Name:", e.Name, "Data:", e.Data)
+		fmt.Println("Insert: Name:", string(e.Name), "Data:", string(e.Data))
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			fmt.Println("SAI:", sr.Read())
+			fmt.Println("SAI:", string(sr.Read()))
 		}()
 	}
 	wg.Wait()

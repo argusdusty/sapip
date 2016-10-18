@@ -62,7 +62,7 @@ type IndexedElements struct {
 }
 
 func MakeIndexedElements() IndexedElements {
-	return IndexedElements{make(map[string]*Element, 0), nil, nil}
+	return IndexedElements{make(map[string]*Element), nil, nil}
 }
 
 // Insert an element
@@ -119,6 +119,19 @@ func (D *IndexedElements) Pop() *Element {
 	return e
 }
 
+// Removes all elements into a slice
+// Equivalent to appending all D.Pop() values into an array
+func (D *IndexedElements) DumpElements() []*Element {
+	r := make([]*Element, 0, len(D.NameIndex))
+	for _, v := range D.NameIndex {
+		r = append(r, v)
+	}
+	D.NameIndex = make(map[string]*Element)
+	D.Front = nil
+	D.End = nil
+	return r
+}
+
 type IndexedPriorityElements struct {
 	NameIndex      map[string]*PriorityElement // Map from each name to pointer to corresponding element
 	PriorityMap    map[int]*PriorityElement    // Map from each priority to the element which is at the end of that priority
@@ -128,7 +141,7 @@ type IndexedPriorityElements struct {
 }
 
 func MakeIndexedPriorityElements() IndexedPriorityElements {
-	return IndexedPriorityElements{make(map[string]*PriorityElement, 0), make(map[int]*PriorityElement, 0), make([]int, 0), make(map[int]int, 0), nil}
+	return IndexedPriorityElements{make(map[string]*PriorityElement), make(map[int]*PriorityElement), make([]int, 0), make(map[int]int), nil}
 }
 
 func (D *IndexedPriorityElements) addPriority(Priority int) int {
@@ -266,4 +279,18 @@ func (D *IndexedPriorityElements) Pop() *PriorityElement {
 	// Remove e
 	delete(D.NameIndex, e.Name)
 	return e
+}
+
+// Removes all elements into a slice
+// Equivalent to appending all D.Pop() values into an array
+func (D *IndexedPriorityElements) DumpElements() []*PriorityElement {
+	r := make([]*PriorityElement, 0, len(D.NameIndex))
+	for _, v := range D.NameIndex {
+		r = append(r, v)
+	}
+	D.NameIndex = make(map[string]*PriorityElement)
+	D.PriorityMap = make(map[int]*PriorityElement)
+	D.Priorities = make([]int, 0)
+	D.Front = nil
+	return r
 }

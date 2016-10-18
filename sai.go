@@ -151,6 +151,13 @@ func (Q *SAIQueue) NumElements() (int, int) {
 	return len(Q.elements.NameIndex), len(Q.execElements)
 }
 
+// Removes all elements from the queue and returns them as a slice
+func (Q *SAIQueue) DumpElements() []*Element {
+	Q.lock.Lock()
+	defer Q.lock.Unlock()
+	return Q.elements.DumpElements()
+}
+
 // Run the queue, executing elements repeatedly
 // Will loop forever (until stopped), so spawn this in a new thread
 func (Q *SAIQueue) Run() {
