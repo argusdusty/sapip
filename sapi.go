@@ -73,18 +73,16 @@ func (Q *SAPIQueue) exec(e *Element) {
 		Q.waitCond.Broadcast()
 	}()
 	// Execute the function and return it in a defer (in case it panics)
-	r := ""
+	var r string
 	defer func() { e.OutChannel.Return(r) }()
 	r = Q.function(e.Name, e.Data)
 }
 
-func (Q *SAPIQueue) getTopElement() *Element {
+func (Q *SAPIQueue) execTopElement() bool {
 	e := Q.elements.Front
 	for e != nil {
 		found := func() bool {
 			found := false
-			Q.execLock.Lock()
-			defer Q.execLock.Unlock()
 			for _, elem := range Q.execElements {
 				if elem.Name == e.Name && elem != e {
 					found = true
@@ -94,29 +92,29 @@ func (Q *SAPIQueue) getTopElement() *Element {
 			return found
 		}()
 		if !found {
-			Q.lock.Lock()
-			defer Q.lock.Unlock()
 			if e == Q.elements.Front {
 				Q.elements.Pop()
 			} else {
 				Q.elements.RemoveElement(e)
 			}
-			return e
+			Q.execElements = append(Q.execElements, e)
+			go Q.exec(e)
+			return true
 		}
 		e = e.Next
 	}
-	return nil
+	return false
 }
 
 // Insert an element into the queue. If an element of that name already
 // exists, the data will be appended into a list.
-func (Q *SAPIQueue) AddElement(Name, Data string) (sr SafeReturn) {
+func (Q *SAPIQueue) AddElement(Name string, Data ...string) (sr SafeReturn) {
 	Q.waitCond.L.Lock()
 	defer Q.waitCond.L.Unlock()
 	Q.lock.Lock()
 	defer Q.lock.Unlock()
 	// Add the element
-	sr = Q.elements.AddElement(Name, Data)
+	sr = Q.elements.AddElement(Name, Data...)
 	// Broadcast that the queue might be non-empty
 	Q.waitCond.Broadcast()
 	return
@@ -159,37 +157,32 @@ func (Q *SAPIQueue) NumElements() (int, int) {
 func (Q *SAPIQueue) Run(Wait time.Duration) {
 	a := time.Tick(Wait)
 	for _ = range a {
-		if Q.stopped {
-			break
-		}
 		// Wait for non-empty queue and wait for an open space
 		// and wait for an element with a name that doesn't match
 		// any currently executing elements
 		Q.waitCond.L.Lock()
-		var e *Element
 		for {
-			if Q.elements.Front == nil {
-				Q.waitCond.Wait()
-				continue
+			if Q.stopped {
+				break
 			}
-			Q.execLock.Lock()
-			check := len(Q.execElements) < Q.limit
-			Q.execLock.Unlock()
-			if !check {
-				Q.waitCond.Wait()
-				continue
+			check := func() bool {
+				Q.lock.Lock()
+				defer Q.lock.Unlock()
+				if Q.elements.Front == nil {
+					return false
+				}
+				Q.execLock.Lock()
+				defer Q.execLock.Unlock()
+				if len(Q.execElements) >= Q.limit {
+					return false
+				}
+				return Q.execTopElement()
+			}()
+			if check {
+				break
 			}
-			e = Q.getTopElement()
-			if e == nil {
-				Q.waitCond.Wait()
-				continue
-			}
-			break
+			Q.waitCond.Wait()
 		}
-		Q.execLock.Lock()
-		Q.execElements = append(Q.execElements, e)
-		Q.execLock.Unlock()
 		Q.waitCond.L.Unlock()
-		go Q.exec(e)
 	}
 }

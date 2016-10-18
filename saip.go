@@ -72,18 +72,16 @@ func (Q *SAIPQueue) exec(e *PriorityElement) {
 		Q.waitCond.Broadcast()
 	}()
 	// Execute the function and return it in a defer (in case it panics)
-	r := ""
+	var r string
 	defer func() { e.OutChannel.Return(r) }()
 	r = Q.function(e.Name, e.Data)
 }
 
-func (Q *SAIPQueue) getTopElement() *PriorityElement {
+func (Q *SAIPQueue) execTopElement() bool {
 	e := Q.elements.Front
 	for e != nil {
 		found := func() bool {
 			found := false
-			Q.execLock.Lock()
-			defer Q.execLock.Unlock()
 			for _, elem := range Q.execElements {
 				if elem.Name == e.Name && elem != e {
 					found = true
@@ -93,18 +91,18 @@ func (Q *SAIPQueue) getTopElement() *PriorityElement {
 			return found
 		}()
 		if !found {
-			Q.lock.Lock()
-			defer Q.lock.Unlock()
 			if e == Q.elements.Front {
 				Q.elements.Pop()
 			} else {
 				Q.elements.RemoveElement(e)
 			}
-			return e
+			Q.execElements = append(Q.execElements, e)
+			go Q.exec(e)
+			return true
 		}
 		e = e.Next
 	}
-	return nil
+	return false
 }
 
 // Insert an element into the queue. If an element of that name already
@@ -157,37 +155,32 @@ func (Q *SAIPQueue) NumElements() (int, int) {
 // Will loop forever (until stopped), so spawn this in a new thread
 func (Q *SAIPQueue) Run() {
 	for {
-		if Q.stopped {
-			break
-		}
 		// Wait for non-empty queue and wait for an open space
 		// and wait for an element with a name that doesn't match
 		// any currently executing elements
 		Q.waitCond.L.Lock()
-		var e *PriorityElement
 		for {
-			if Q.elements.Front == nil {
-				Q.waitCond.Wait()
-				continue
+			if Q.stopped {
+				break
 			}
-			Q.execLock.Lock()
-			check := len(Q.execElements) < Q.limit
-			Q.execLock.Unlock()
-			if !check {
-				Q.waitCond.Wait()
-				continue
+			check := func() bool {
+				Q.lock.Lock()
+				defer Q.lock.Unlock()
+				if Q.elements.Front == nil {
+					return false
+				}
+				Q.execLock.Lock()
+				defer Q.execLock.Unlock()
+				if len(Q.execElements) >= Q.limit {
+					return false
+				}
+				return Q.execTopElement()
+			}()
+			if check {
+				break
 			}
-			e = Q.getTopElement()
-			if e == nil {
-				Q.waitCond.Wait()
-				continue
-			}
-			break
+			Q.waitCond.Wait()
 		}
-		Q.execLock.Lock()
-		Q.execElements = append(Q.execElements, e)
-		Q.execLock.Unlock()
 		Q.waitCond.L.Unlock()
-		go Q.exec(e)
 	}
 }

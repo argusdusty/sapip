@@ -15,34 +15,35 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package sapip
+package sapip_bytes
 
 import (
+	"bytes"
 	"sync"
 )
 
-type SAIQueue struct {
+type SAIPQueue struct {
 	lock         *sync.Mutex // Global lock
 	execLock     *sync.Mutex // Lock for manipulating execElements
-	waitCond     *sync.Cond  // Wait for queue to be non-empty and have an open slow in execElements
-	elements     IndexedElements
-	execElements []*Element
+	waitCond     *sync.Cond  // Wait for queue to be non-empty and open slot in execElements
+	elements     IndexedPriorityElements
+	execElements []*PriorityElement
 	limit        int
 	function     QueueFunction
 	stopped      bool
 	errFunc      QueueErrFunction
 }
 
-// Returns a new Safe Asynchronous Indexed Queue
+// Returns a new Safe Asynchronous Indexed Priority Queue
 // with f as the handler function for elements, and limit as the
 // maximum number of simultaneously executing elements
-func NewSAIQueue(f QueueFunction, limit int) *SAIQueue {
-	var Q SAIQueue
+func NewSAIPQueue(f QueueFunction, limit int) *SAIPQueue {
+	var Q SAIPQueue
 	Q.lock = new(sync.Mutex)
 	Q.execLock = new(sync.Mutex)
 	Q.waitCond = sync.NewCond(new(sync.Mutex))
-	Q.elements = MakeIndexedElements()
-	Q.execElements = make([]*Element, 0)
+	Q.elements = MakeIndexedPriorityElements()
+	Q.execElements = make([]*PriorityElement, 0)
 	Q.limit = limit
 	Q.function = f
 	Q.stopped = false
@@ -50,7 +51,7 @@ func NewSAIQueue(f QueueFunction, limit int) *SAIQueue {
 	return &Q
 }
 
-func (Q *SAIQueue) exec(e *Element) {
+func (Q *SAIPQueue) exec(e *PriorityElement) {
 	defer func() {
 		if r := recover(); r != nil {
 			Q.errFunc(e.Name, r)
@@ -72,18 +73,18 @@ func (Q *SAIQueue) exec(e *Element) {
 		Q.waitCond.Broadcast()
 	}()
 	// Execute the function and return it in a defer (in case it panics)
-	var r string
+	var r []byte
 	defer func() { e.OutChannel.Return(r) }()
 	r = Q.function(e.Name, e.Data)
 }
 
-func (Q *SAIQueue) execTopElement() bool {
+func (Q *SAIPQueue) execTopElement() bool {
 	e := Q.elements.Front
 	for e != nil {
 		found := func() bool {
 			found := false
 			for _, elem := range Q.execElements {
-				if elem.Name == e.Name && elem != e {
+				if bytes.Equal(elem.Name, e.Name) && elem != e {
 					found = true
 					break
 				}
@@ -106,14 +107,14 @@ func (Q *SAIQueue) execTopElement() bool {
 }
 
 // Insert an element into the queue. If an element of that name already
-// exists, the data will be appended into a list.
-func (Q *SAIQueue) AddElement(Name string, Data ...string) (sr SafeReturn) {
+// exists, the data will be appended into a list. Smaller priorities run first.
+func (Q *SAIPQueue) AddElement(Name, Data []byte, Priority int) (sr SafeReturn) {
 	Q.waitCond.L.Lock()
 	defer Q.waitCond.L.Unlock()
 	Q.lock.Lock()
 	defer Q.lock.Unlock()
 	// Add the element
-	sr = Q.elements.AddElement(Name, Data...)
+	sr = Q.elements.AddElement(Name, Data, Priority)
 	// Broadcast that the queue might be non-empty
 	Q.waitCond.Broadcast()
 	return
@@ -122,7 +123,7 @@ func (Q *SAIQueue) AddElement(Name string, Data ...string) (sr SafeReturn) {
 // Update the limit on the number of simultaneously executing
 // elements. If there are more than limit currently executing,
 // the queue will wait until it is under the new limit.
-func (Q *SAIQueue) SetLimit(limit int) {
+func (Q *SAIPQueue) SetLimit(limit int) {
 	Q.waitCond.L.Lock()
 	defer Q.waitCond.L.Unlock()
 	Q.limit = limit
@@ -131,19 +132,19 @@ func (Q *SAIQueue) SetLimit(limit int) {
 
 // Set a new error handling function, which handles panics encountered
 // When executing elements. By default this is a log.Println
-func (Q *SAIQueue) SetErrorFunc(errFunc QueueErrFunction) {
+func (Q *SAIPQueue) SetErrorFunc(errFunc QueueErrFunction) {
 	Q.errFunc = errFunc
 }
 
 // Stops the execution of the queue. Currently executing elements
 // will continue to run, but no new elements will start executing
-func (Q *SAIQueue) Stop() {
+func (Q *SAIPQueue) Stop() {
 	Q.stopped = true
 }
 
 // Returns the number of elements waiting in the queue, and
 // the number of currently executing elements
-func (Q *SAIQueue) NumElements() (int, int) {
+func (Q *SAIPQueue) NumElements() (int, int) {
 	Q.lock.Lock()
 	defer Q.lock.Unlock()
 	Q.execLock.Lock()
@@ -153,7 +154,7 @@ func (Q *SAIQueue) NumElements() (int, int) {
 
 // Run the queue, executing elements repeatedly
 // Will loop forever (until stopped), so spawn this in a new thread
-func (Q *SAIQueue) Run() {
+func (Q *SAIPQueue) Run() {
 	for {
 		// Wait for non-empty queue and wait for an open space
 		// and wait for an element with a name that doesn't match

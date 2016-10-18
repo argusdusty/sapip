@@ -15,9 +15,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package sapip
+package sapip_bytes
 
 import (
+	"bytes"
 	"sync"
 )
 
@@ -72,7 +73,7 @@ func (Q *SAIQueue) exec(e *Element) {
 		Q.waitCond.Broadcast()
 	}()
 	// Execute the function and return it in a defer (in case it panics)
-	var r string
+	var r []byte
 	defer func() { e.OutChannel.Return(r) }()
 	r = Q.function(e.Name, e.Data)
 }
@@ -83,7 +84,7 @@ func (Q *SAIQueue) execTopElement() bool {
 		found := func() bool {
 			found := false
 			for _, elem := range Q.execElements {
-				if elem.Name == e.Name && elem != e {
+				if bytes.Equal(elem.Name, e.Name) && elem != e {
 					found = true
 					break
 				}
@@ -107,7 +108,7 @@ func (Q *SAIQueue) execTopElement() bool {
 
 // Insert an element into the queue. If an element of that name already
 // exists, the data will be appended into a list.
-func (Q *SAIQueue) AddElement(Name string, Data ...string) (sr SafeReturn) {
+func (Q *SAIQueue) AddElement(Name []byte, Data ...[]byte) (sr SafeReturn) {
 	Q.waitCond.L.Lock()
 	defer Q.waitCond.L.Unlock()
 	Q.lock.Lock()

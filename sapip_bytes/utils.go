@@ -15,38 +15,38 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package sapip
+package sapip_bytes
 
 import (
 	"log"
 )
 
-type SafeReturn chan string
+type SafeReturn chan []byte
 
-func (SR SafeReturn) Return(value string) { SR <- value }
-func (SR SafeReturn) Read() string        { value := <-SR; SR <- value; return value }
+func (SR SafeReturn) Return(value []byte) { SR <- value }
+func (SR SafeReturn) Read() []byte        { value := <-SR; SR <- value; return value }
 
 type Element struct {
-	Name       string
-	Data       []string
+	Name       []byte
+	Data       [][]byte
 	OutChannel SafeReturn
 	Next       *Element
 	Prev       *Element
 }
 
 type PriorityElement struct {
-	Name       string
-	Data       []string
+	Name       []byte
+	Data       [][]byte
 	Priority   int
 	OutChannel SafeReturn
 	Next       *PriorityElement
 	Prev       *PriorityElement
 }
 
-type QueueFunction func(name string, data []string) string
-type QueueErrFunction func(name string, err interface{})
+type QueueFunction func(name []byte, data [][]byte) []byte
+type QueueErrFunction func(name []byte, err interface{})
 
-func defaultErrFunc(name string, err interface{}) {
+func defaultErrFunc(name []byte, err interface{}) {
 	log.Println("Error in queue on element:", name, "-", err)
 }
 
@@ -66,8 +66,8 @@ func MakeIndexedElements() IndexedElements {
 }
 
 // Insert an element
-func (D *IndexedElements) AddElement(Name string, Data ...string) SafeReturn {
-	if p, ok := D.NameIndex[Name]; ok {
+func (D *IndexedElements) AddElement(Name []byte, Data ...[]byte) SafeReturn {
+	if p, ok := D.NameIndex[string(Name)]; ok {
 		p.Data = append(p.Data, Data...)
 		return p.OutChannel
 	}
@@ -80,7 +80,7 @@ func (D *IndexedElements) AddElement(Name string, Data ...string) SafeReturn {
 		D.Front = e
 	}
 	D.End = e
-	D.NameIndex[e.Name] = e
+	D.NameIndex[string(e.Name)] = e
 	return e.OutChannel
 }
 
@@ -100,7 +100,7 @@ func (D *IndexedElements) RemoveElement(e *Element) {
 	}
 	e.Next = nil
 	e.Prev = nil
-	delete(D.NameIndex, e.Name)
+	delete(D.NameIndex, string(e.Name))
 }
 
 // Remove the front element
@@ -115,7 +115,7 @@ func (D *IndexedElements) Pop() *Element {
 	}
 	e.Next = nil
 	e.Prev = nil
-	delete(D.NameIndex, e.Name)
+	delete(D.NameIndex, string(e.Name))
 	return e
 }
 
@@ -177,13 +177,13 @@ func (D *IndexedPriorityElements) add(e *PriorityElement) {
 	}
 	// Add e to the indexes
 	D.PriorityMap[e.Priority] = e
-	D.NameIndex[e.Name] = e
+	D.NameIndex[string(e.Name)] = e
 }
 
 // Insert an element
-func (D *IndexedPriorityElements) AddElement(Name, Data string, Priority int) SafeReturn {
+func (D *IndexedPriorityElements) AddElement(Name, Data []byte, Priority int) SafeReturn {
 	// If the element name is already in the queue we need to do special stuff
-	if p, ok := D.NameIndex[Name]; ok {
+	if p, ok := D.NameIndex[string(Name)]; ok {
 		// Append the data
 		p.Data = append(p.Data, Data)
 		// If the new priority is smaller, we need to remove the old element and insert it with the new priority
@@ -196,7 +196,7 @@ func (D *IndexedPriorityElements) AddElement(Name, Data string, Priority int) Sa
 		return p.OutChannel
 	}
 	// Go ahead and insert the element
-	e := &PriorityElement{Name, []string{Data}, Priority, make(SafeReturn, 1), nil, nil}
+	e := &PriorityElement{Name, [][]byte{Data}, Priority, make(SafeReturn, 1), nil, nil}
 	D.add(e)
 	return e.OutChannel
 }
@@ -241,7 +241,7 @@ func (D *IndexedPriorityElements) RemoveElement(e *PriorityElement) {
 	// Clear the pointers of e
 	e.Next = nil
 	e.Prev = nil
-	delete(D.NameIndex, e.Name)
+	delete(D.NameIndex, string(e.Name))
 }
 
 // Remove the front element
@@ -264,6 +264,6 @@ func (D *IndexedPriorityElements) Pop() *PriorityElement {
 	e.Next = nil
 	e.Prev = nil
 	// Remove e
-	delete(D.NameIndex, e.Name)
+	delete(D.NameIndex, string(e.Name))
 	return e
 }
