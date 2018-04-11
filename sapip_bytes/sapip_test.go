@@ -179,7 +179,7 @@ func BenchmarkSaiAddElements(b *testing.B) {
 	BenchSAIQueue := NewSAIQueue(DrainCommand, 1)
 	for i := 0; i < b.N; i++ {
 		wg.Add(1)
-		BenchSAIQueue.AddElement(Uint32ToByteArray(uint32(i)), nil)
+		BenchSAIQueue.AddElement(Uint32ToByteArray(uint32(i)))
 	}
 	go BenchSAIQueue.Run()
 	wg.Wait()

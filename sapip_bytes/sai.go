@@ -30,6 +30,7 @@ type SAIQueue struct {
 	execElements []*Element
 	limit        int
 	function     QueueFunction
+	closed       bool
 	stopped      bool
 	errFunc      QueueErrFunction
 }
@@ -108,7 +109,11 @@ func (Q *SAIQueue) execTopElement() bool {
 
 // Insert an element into the queue. If an element of that name already
 // exists, the data will be appended into a list.
+// If the queue is closed AddElement will panic.
 func (Q *SAIQueue) AddElement(Name []byte, Data ...[]byte) (sr SafeReturn) {
+	if Q.closed {
+		panic("Unable to add element. Queue is closed")
+	}
 	Q.waitCond.L.Lock()
 	defer Q.waitCond.L.Unlock()
 	Q.lock.Lock()
@@ -137,9 +142,43 @@ func (Q *SAIQueue) SetErrorFunc(errFunc QueueErrFunction) {
 }
 
 // Stops the execution of the queue. Currently executing elements
-// will continue to run, but no new elements will start executing
+// will continue to run, but no enqueued elements will start executing.
+// You must re-run Run to start the queue again.
 func (Q *SAIQueue) Stop() {
 	Q.stopped = true
+}
+
+// Closes the queue to prevent more elements from being enqueued.
+// If an new element is attempted to be added, AddElement will panic.
+// There is no way to re-open a queue once closed.
+func (Q *SAIQueue) Close() {
+	Q.closed = true
+}
+
+// Waits for the queue to finish stopping/closing. Use after calling Stop or Close.
+// If only stopped, Wait will wait until all executing elements have completed.
+// If closed, Wait will wait until the queue is empty.
+func (Q *SAIQueue) Wait() {
+	if Q.stopped {
+		Q.waitCond.L.Lock()
+		for {
+			if Q.checkExecEmpty() {
+				break
+			}
+			Q.waitCond.Wait()
+		}
+		Q.waitCond.L.Unlock()
+	}
+	if Q.closed {
+		Q.waitCond.L.Lock()
+		for {
+			if Q.checkEmpty() {
+				break
+			}
+			Q.waitCond.Wait()
+		}
+		Q.waitCond.L.Unlock()
+	}
 }
 
 // Returns the number of elements waiting in the queue, and
@@ -159,32 +198,47 @@ func (Q *SAIQueue) DumpElements() []*Element {
 	return Q.elements.DumpElements()
 }
 
+func (Q *SAIQueue) checkEmpty() bool {
+	Q.lock.Lock()
+	defer Q.lock.Unlock()
+	Q.execLock.Lock()
+	defer Q.execLock.Unlock()
+	return len(Q.elements.NameIndex) == 0 && len(Q.execElements) == 0
+}
+
+func (Q *SAIQueue) checkExecEmpty() bool {
+	Q.lock.Lock()
+	defer Q.lock.Unlock()
+	Q.execLock.Lock()
+	defer Q.execLock.Unlock()
+	return len(Q.execElements) == 0
+}
+
+func (Q *SAIQueue) checkExec() bool {
+	Q.lock.Lock()
+	defer Q.lock.Unlock()
+	if Q.elements.Front == nil {
+		return false
+	}
+	Q.execLock.Lock()
+	defer Q.execLock.Unlock()
+	if len(Q.execElements) >= Q.limit {
+		return false
+	}
+	return Q.execTopElement()
+}
+
 // Run the queue, executing elements repeatedly
 // Will loop forever (until stopped), so spawn this in a new thread
 func (Q *SAIQueue) Run() {
-	for {
+	Q.stopped = false
+	for !Q.stopped {
 		// Wait for non-empty queue and wait for an open space
 		// and wait for an element with a name that doesn't match
 		// any currently executing elements
 		Q.waitCond.L.Lock()
-		for {
-			if Q.stopped {
-				break
-			}
-			check := func() bool {
-				Q.lock.Lock()
-				defer Q.lock.Unlock()
-				if Q.elements.Front == nil {
-					return false
-				}
-				Q.execLock.Lock()
-				defer Q.execLock.Unlock()
-				if len(Q.execElements) >= Q.limit {
-					return false
-				}
-				return Q.execTopElement()
-			}()
-			if check {
+		for !Q.stopped {
+			if Q.checkExec() {
 				break
 			}
 			Q.waitCond.Wait()
